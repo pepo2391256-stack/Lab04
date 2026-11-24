@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab 04 · UI Preview (ไม่ใช่ผลจำลอง)</title>
+<link rel="stylesheet" href="static/style.css"></head><body>
+<header class="hero"><div class="shell">
+<p class="overline">ENG29 2121 · LAB 04</p>
+<h1>UI Preview เฉพาะหน้าฟอร์ม <small>ไฟล์นี้ไม่ได้รัน ngspice — ไม่ใช่ผลการจำลอง</small></h1>
+<p>ใช้ใส่ค่าเพื่อทดสอบหน้าตา/การกรอกข้อมูลเท่านั้น ปุ่มด้านล่างเพียงแสดงค่าที่กรอกลงในกล่อง “Test echo” ไม่มี netlist ไม่มี solver</p>
+</div></header>
+<main class="shell">
+<section id="controls">
+<h2>กรอกค่าทดสอบ</h2>
+<div class="engine-switch" role="group" aria-label="Engine">
+<label class="engine-card"><input type="radio" name="engine" value="analytical"><span><b>Analytical DC Bias</b><small>dc_bias.py · Lab 3</small></span></label>
+<label class="engine-card"><input type="radio" name="engine" value="spice" checked><span><b>SPICE CE Simulator</b><small>spice_engine.py · ngspice</small></span></label>
+</div>
+
+<form id="analytical-form" hidden>
+<h3>Analytical DC Bias</h3>
+<div class="grid">
+<label class="field"><span class="field-label">Bias mode</span><select id="bias_mode"><option value="fixed">Fixed</option><option value="emitter">Emitter</option><option value="divider" selected>Divider</option></select></label>
+<label class="field"><span class="field-label">VCC</span><span class="input-wrap"><input id="a_vcc" value="12"><em>V</em></span></label>
+<label class="field"><span class="field-label">β</span><span class="input-wrap"><input id="a_beta" value="100"><em></em></span></label>
+<label class="field"><span class="field-label">VBE</span><span class="input-wrap"><input id="a_vbe" value="0.7"><em>V</em></span></label>
+<label class="field"><span class="field-label">RC</span><span class="input-wrap"><input id="a_rc" value="2.2"><em>kΩ</em></span></label>
+<label class="field"><span class="field-label">R1</span><span class="input-wrap"><input id="a_r1" value="100"><em>kΩ</em></span></label>
+<label class="field"><span class="field-label">R2</span><span class="input-wrap"><input id="a_r2" value="22"><em>kΩ</em></span></label>
+<label class="field"><span class="field-label">RE</span><span class="input-wrap"><input id="a_re" value="1"><em>kΩ</em></span></label>
+</div>
+<button type="button" onclick="echoAnalytical()">Test analytical values</button>
+</form>
+
+<form id="spice-form">
+<h3>SPICE · CE Voltage Divider</h3>
+<div class="grid">
+<label class="field"><span class="field-label">Analysis</span><select id="analysis"><option value="dc">DC .op</option><option value="ac">AC .ac</option><option value="tran" selected>Transient .tran</option></select></label>
+<label class="field"><span class="field-label">VCC</span><span class="input-wrap"><input id="vcc" value="12"><em>V</em></span></label>
+<label class="field"><span class="field-label">R1</span><span class="input-wrap"><input id="r1" value="100"><em>kΩ</em></span></label>
+<label class="field"><span class="field-label">R2</span><span class="input-wrap"><input id="r2" value="22"><em>kΩ</em></span></label>
+<label class="field"><span class="field-label">RC</span><span class="input-wrap"><input id="rc" value="2.2"><em>kΩ</em></span></label>
+<label class="field"><span class="field-label">RE</span><span class="input-wrap"><input id="re" value="1"><em>kΩ</em></span></label>
+<label class="field"><span class="field-label">RL</span><span class="input-wrap"><input id="rl" value="10"><em>kΩ</em></span></label>
+<label class="field"><span class="field-label">Cin</span><span class="input-wrap"><input id="cin" value="10"><em>µF</em></span></label>
+<label class="field"><span class="field-label">Cout</span><span class="input-wrap"><input id="cout" value="10"><em>µF</em></span></label>
+<label class="field"><span class="field-label">Amplitude</span><span class="input-wrap"><input id="amp" value="10"><em>mV peak</em></span></label>
+<label class="field"><span class="field-label">Frequency</span><span class="input-wrap"><input id="freq" value="1000"><em>Hz</em></span></label>
+</div>
+<button type="button" onclick="echoSpice()">Test SPICE values</button>
+</form>
+</section>
+
+<section id="results"><h2>Test echo (ไม่ใช่ผล ngspice)</h2><pre id="echo">ยังไม่มีข้อมูล</pre></section>
+</main>
+<footer>ENG29 2121 · Lab 04 · UI preview only — ต้องรัน Flask + ngspice เพื่อดูผลจริงที่ http://127.0.0.1:5000/</footer>
+<script>
+function val(id){return document.getElementById(id).value;}
+document.querySelectorAll('input[name="engine"]').forEach(function(r){r.addEventListener('change',function(){
+  var v=document.querySelector('input[name="engine"]:checked').value;
+  document.getElementById('analytical-form').hidden=v!=='analytical';
+  document.getElementById('spice-form').hidden=v!=='spice';
+});});
+function echoSpice(){
+  var lines=['UI ECHO — ไม่ใช่ผลการจำลอง','analysis: '+val('analysis'),'VCC: '+val('vcc')+' V','R1: '+val('r1')+' kΩ','R2: '+val('r2')+' kΩ','RC: '+val('rc')+' kΩ','RE: '+val('re')+' kΩ','RL: '+val('rl')+' kΩ','Cin/Cout: '+val('cin')+' / '+val('cout')+' µF','source: '+val('amp')+' mV peak @ '+val('freq')+' Hz'];
+  if(Number(val('re'))<=0){lines.push('WARNING: RE ต้องมากกว่า 0 — engine จะปฏิเสธก่อนสร้าง netlist');}
+  document.getElementById('echo').textContent=lines.join('\n');
+}
+function echoAnalytical(){
+  document.getElementById('echo').textContent=['UI ECHO — ไม่ใช่ผลการคำนวณ','bias: '+val('bias_mode'),'VCC: '+val('a_vcc')+' V, β: '+val('a_beta')+', VBE: '+val('a_vbe')+' V','R1/R2: '+val('a_r1')+' / '+val('a_r2')+' kΩ, RC: '+val('a_rc')+' kΩ, RE: '+val('a_re')+' kΩ'].join('\n');
+}
+</script>
+</body></html>

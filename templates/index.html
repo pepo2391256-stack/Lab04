@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="th"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ENG29 2121 · Lab 04 — BJT CE Amplifier Simulator</title>
+<meta name="description" content="ENG29 2121 Lab 04: analytical DC bias และจำลอง BJT common-emitter ด้วย ngspice จริง (.op/.ac/.tran) พร้อมหลักฐานการรัน">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head><body>
+
+{% macro field(name, label, values, key, unit, modes='all', hint='', min='0') -%}
+<label class="field" {% if modes != 'all' %}data-modes="{{ modes }}"{% endif %}>
+  <span class="field-label">{{ label }}</span>
+  <span class="input-wrap"><input type="number" inputmode="decimal" min="{{ min }}" step="any" required
+      name="{{ name }}" value="{{ values[key] }}" {% if hint %}aria-describedby="hint-{{ name }}"{% endif %}><em>{{ unit }}</em></span>
+  {% if hint %}<small id="hint-{{ name }}">{{ hint }}</small>{% endif %}
+</label>
+{%- endmacro %}
+
+<header class="hero"><div class="shell">
+<p class="overline">ENG29 2121 · COMPUTER PROGRAMMING FOR ELECTRICAL ENGINEERS</p>
+<h1>Lab 04 · BJT CE Amplifier Simulator <small>DC bias จาก Lab 3 + จำลอง CE ด้วย ngspice จริง</small></h1>
+<p>เลือกเส้นทาง <strong>Analytical DC Bias</strong> แบบเดิมจาก Lab 3 หรือ <strong>SPICE CE Simulator</strong> ที่รัน ngspice จริงสำหรับ DC / AC / Transient</p>
+<p class="engine-status"><span class="badge {{ 'ok' if status.ready else 'bad' }}">{{ status.message }}</span>
+{% if status.fallback %}<span class="badge bad">โมเดลสำรองจากตัวอย่าง ngspice — ยังไม่ใช่ Starter Kit อาจารย์ ผลใช้ตรวจ pipeline เท่านั้น</span>{% endif %}</p>
+</div></header>
+
+<main class="shell">
+<nav aria-label="สารบัญ">
+<a href="#controls">ควบคุม</a><a href="#results">ผลลัพธ์</a><a href="#notes">หมายเหตุ</a>
+</nav>
+
+<section id="controls">
+<h2>1 · เลือกเส้นทางและกรอกพารามิเตอร์</h2>
+
+<figure class="topology">
+<svg viewBox="0 0 720 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="แผนภาพวงจร CE กับตำแหน่งวัด Vin ที่ node in และ Vout ที่ node out">
+<title>CE topology และตำแหน่งวัดสัญญาณ</title>
+<rect width="720" height="180" rx="10" fill="#f6fafc" stroke="#cedde7"/>
+<g stroke="#486275" stroke-width="2" fill="none">
+  <path d="M70 40 H180 M260 40 H360 V82 M360 108 V140 H430 M430 108 V40 H500 M500 60 H570 M70 110 H300 M360 82 H430"/>
+  <path d="M140 70 V110 M140 130 V158 M70 158 H140 M300 110 H340 M380 140 V158 M500 108 V158"/>
+</g>
+<g fill="#e6eff7" stroke="#103658" stroke-width="2">
+  <rect x="180" y="30" width="80" height="20" rx="3"/>
+  <rect x="100" y="60" width="80" height="20" rx="3"/>
+  <rect x="100" y="120" width="80" height="20" rx="3"/>
+  <rect x="380" y="140" width="80" height="20" rx="3"/>
+  <rect x="500" y="40" width="70" height="20" rx="3"/>
+</g>
+<g fill="#103658" stroke="#07766e" stroke-width="2"><circle cx="360" cy="95" r="27" fill="#eaf6f2"/></g>
+<g font-family="inherit" font-size="13" fill="#17344b">
+  <text x="188" y="45">RC</text><text x="108" y="75">R1</text><text x="108" y="135">R2</text>
+  <text x="388" y="155">RE</text><text x="507" y="55">RL</text>
+  <text x="40" y="105" font-weight="700">in</text><text x="435" y="78" font-weight="700">out</text>
+  <text x="345" y="99" text-anchor="middle" font-weight="700">NPN</text>
+  <text x="66" y="32">VCC</text><text x="505" y="146">COUT</text><text x="250" y="105">CIN</text>
+</g>
+<g stroke="#486275" stroke-width="2"><path d="M124 158 h32 M130 164 h20 M136 170 h8"/></g>
+</svg>
+<figcaption>แผนภาพตำแหน่งวัด: <code>Vin</code> ที่ node <code>in</code> ก่อน C<sub>IN</sub> · <code>Vout</code> ที่ node <code>out</code> บน R<sub>L</sub> หลัง C<sub>OUT</sub> · baseline ไม่มี C<sub>E</sub></figcaption>
+</figure>
+
+<div class="engine-switch" role="group" aria-label="Engine">
+  <label class="engine-card"><input type="radio" name="engine" value="analytical" {% if engine == 'analytical' %}checked{% endif %}><span><b>Analytical DC Bias</b><small>คำนวณ DC bias 3 แบบจาก Lab 3 · Fixed / Emitter / Divider</small></span></label>
+  <label class="engine-card"><input type="radio" name="engine" value="spice" {% if engine != 'analytical' %}checked{% endif %}><span><b>SPICE CE Simulator</b><small>รัน .op / .ac / .tran จริง · ได้กราฟและไฟล์หลักฐาน</small></span></label>
+</div>
+
+<form id="analytical-form" action="/analytical" method="post" {% if engine != 'analytical' %}hidden{% endif %}>
+<input type="hidden" name="engine" value="analytical">
+<h3>Analytical DC Bias (คงไว้จาก Lab 3)</h3>
+<label class="field"><span class="field-label">Bias mode</span>
+  <select name="bias_mode" id="bias_mode">
+    <option value="fixed" {% if bias_mode == 'fixed' %}selected{% endif %}>Fixed Bias</option>
+    <option value="emitter" {% if bias_mode == 'emitter' %}selected{% endif %}>Emitter Bias</option>
+    <option value="divider" {% if bias_mode == 'divider' %}selected{% endif %}>Voltage Divider Bias</option>
+  </select>
+</label>
+<div class="grid">
+  {{ field('vcc', 'VCC', analytical_values, 'vcc', 'V', min='1') }}
+  {{ field('beta', 'β', analytical_values, 'beta', '', min='1') }}
+  {{ field('vbe', 'VBE', analytical_values, 'vbe', 'V', min='0.1') }}
+  {{ field('rc', 'RC', analytical_values, 'rc', 'kΩ') }}
+  {{ field('rb', 'RB', analytical_values, 'rb', 'kΩ', 'fixed emitter', 'ใช้ใน Fixed/Emitter') }}
+  {{ field('r1', 'R1', analytical_values, 'r1', 'kΩ', 'divider', 'ใช้ใน Divider') }}
+  {{ field('r2', 'R2', analytical_values, 'r2', 'kΩ', 'divider', 'ใช้ใน Divider') }}
+  {{ field('re', 'RE', analytical_values, 're', 'kΩ', 'emitter divider', 'ใช้ใน Emitter/Divider') }}
+</div>
+<p class="notice info">ผลคือ <strong>analytical reference</strong> จากสมการ β/VBE คงที่ ไม่ใช่ผล ngspice และไม่ต้องเท่ากันทุกหลักกับผล SPICE</p>
+<button type="submit">Run analytical DC</button>
+</form>
+
+<form id="spice-form" action="/simulate" method="post" {% if engine == 'analytical' %}hidden{% endif %}>
+<input type="hidden" name="engine" value="spice">
+<h3>SPICE · CE Voltage Divider อ้างอิง</h3>
+<label class="field"><span class="field-label">Analysis mode</span>
+  <select name="analysis" id="analysis" aria-describedby="analysis-hint">
+    <option value="dc" {% if analysis == 'dc' %}selected{% endif %}>DC · .op</option>
+    <option value="ac" {% if analysis == 'ac' %}selected{% endif %}>AC · .ac</option>
+    <option value="tran" {% if analysis == 'tran' %}selected{% endif %}>Transient · .tran</option>
+  </select>
+</label>
+<p id="analysis-hint" class="soft" aria-live="polite"></p>
+<fieldset>
+  <legend>DC bias network</legend>
+  <div class="grid">
+    {{ field('vcc', 'VCC', spice_values, 'vcc', 'V', min='1') }}
+    {{ field('r1', 'R1', spice_values, 'r1', 'kΩ') }}
+    {{ field('r2', 'R2', spice_values, 'r2', 'kΩ') }}
+    {{ field('rc', 'RC', spice_values, 'rc', 'kΩ') }}
+    {{ field('re', 'RE', spice_values, 're', 'kΩ', 'all', 'ต้องมากกว่า 0 — 0 จะถูกปฏิเสธโดย server') }}
+    {{ field('rl', 'RL', spice_values, 'rl', 'kΩ') }}
+  </div>
+</fieldset>
+<fieldset data-modes="ac tran">
+  <legend>Coupling capacitors</legend>
+  <div class="grid">
+    {{ field('cin_uf', 'Cin', spice_values, 'cin_uf', 'µF', 'ac tran') }}
+    {{ field('cout_uf', 'Cout', spice_values, 'cout_uf', 'µF', 'ac tran') }}
+  </div>
+</fieldset>
+<fieldset data-modes="ac tran">
+  <legend>Input source</legend>
+  <div class="grid">
+    {{ field('amp_mv', 'Amplitude', spice_values, 'amp_mv', 'mV peak', 'ac tran') }}
+    {{ field('freq_hz', 'Frequency', spice_values, 'freq_hz', 'Hz', 'ac tran', min='1') }}
+  </div>
+</fieldset>
+<p class="notice info">Vin วัดที่ node <code>in</code> · Vout วัดที่ node <code>out</code> · ใช้ BJT model ที่ระบุในผลลัพธ์เสมอ</p>
+<button type="submit">Run ngspice</button>
+</form>
+</section>
+
+<section id="results" aria-live="polite">
+<h2>2 · ผลที่ได้</h2>
+{% if error %}
+<div class="notice warn"><strong>Run error</strong><pre>{{ error }}</pre></div>
+{% endif %}
+
+{% if result %}
+{% set rid_list = (result.get('provenance') or []) | selectattr('label', 'equalto', 'Run ID') | map(attribute='value') | list %}
+<p class="result-ready">Result ready · {{ result.kind }}{% if rid_list %} · {{ rid_list[0] }}{% endif %}</p>
+<h3>{{ result.title }}</h3>
+<div class="badges">
+  <span class="badge ok">status: {{ result.status }}</span>
+  <span class="badge">{{ result.kind }}</span>
+</div>
+
+<p class="notice info result-guide"><strong>อ่านผลยังไง:</strong> ดูหน่วยให้ตรงคำถาม · ดู note/provenance ว่าค่ามาจาก node ไหน · ผล SPICE ขึ้นกับ BJT model จึงไม่บังคับให้เท่ากับ analytical ทุกหลัก ให้เทียบทิศทางและช่วงค่าที่สมเหตุสมผลแทน</p>
+
+<div class="scroll"><table>
+<thead><tr><th>Quantity</th><th>Value</th><th>Unit</th><th>Note / provenance</th></tr></thead>
+<tbody>
+{% for item in result['values'] %}<tr><td>{{ item.label }}</td><td>{{ item.value }}</td><td>{{ item.unit }}</td><td>{{ item.note }}</td></tr>{% endfor %}
+</tbody></table></div>
+
+{% if result.charts %}
+<div class="charts">
+{% for chart in result.charts %}<figure class="chart">{{ chart.svg|safe }}<figcaption>{{ chart.title }} — กราฟสร้างจาก RAW ของรอบนี้</figcaption></figure>{% endfor %}
+</div>
+{% endif %}
+
+{% if result.warnings %}<div class="notice warn"><strong>Warnings</strong><ul>{% for warning in result.warnings %}<li>{{ warning }}</li>{% endfor %}</ul></div>{% endif %}
+{% if result.assumptions %}<div class="notice info"><strong>Assumptions</strong><ul>{% for item in result.assumptions %}<li>{{ item }}</li>{% endfor %}</ul></div>{% endif %}
+
+{% if result.provenance %}
+<div class="scroll"><table>
+<thead><tr><th>Provenance</th><th>Value</th></tr></thead>
+<tbody>{% for item in result.provenance %}<tr><td>{{ item.label }}</td><td>{{ item.value }}</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endif %}
+
+{% if result.links %}<p class="artifacts">Evidence: {% for link in result.links %}<a href="{{ link.url }}">{{ link.label }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>{% endif %}
+{% else %}
+<p class="soft">ยังไม่มีผลในรอบนี้ กด Run ด้านบนเพื่อสร้าง netlist และรัน solver จริง</p>
+{% endif %}
+</section>
+
+<section id="notes">
+<details open>
+<summary>3 · กฎที่ต้องรักษา (สำหรับตรวจรับ)</summary>
+<ul>
+<li>Lab 3 ยังอยู่: Fixed / Emitter / Divider ใช้ <code>dc_bias.py</code> เหมือนเดิม</li>
+<li>SPICE ใช้ <code>subprocess.run([...])</code> แบบ list มี <code>timeout</code> และ <code>cwd</code> แยกต่อรอบ</li>
+<li>engine ไม่พร้อมหรือ raw ว่าง ต้องแจ้ง error ไม่โชว์กราฟเก่า</li>
+<li>ผลแต่ละเส้นทางมีป้ายที่มาเสมอ</li>
+</ul>
+</details>
+</section>
+</main>
+
+<footer>ENG29 2121 · Lab 04 · Flask + ngspice · ผลจำลองอ่านจาก RAW จริง ไม่ใช่ mock data</footer>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body></html>
