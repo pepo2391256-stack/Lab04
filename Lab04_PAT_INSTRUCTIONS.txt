@@ -1,0 +1,13 @@
+﻿วิธีอัป Lab04 ขึ้น GitHub (ถ้า device login ไม่ผ่าน)
+====================================================
+1. เปิด https://github.com/settings/tokens
+2. Generate new token (classic)
+3. ตั้งชื่อ: Lab04 push
+4. Expiration: เลือกได้ (เช่น 7 days)
+5. Select scopes: เช็คเฉพาะ [repo]
+6. กด Generate token แล้วก็อปปี้ token (ขึ้นต้นด้วย ghp_...)
+7. ดับเบิลคลิกไฟล์ Lab04_PUSH.bat บน Desktop
+8. วาง token แล้วกด Enter
+9. ถ้าขึ้น PUSH SUCCESS = เสร็จแล้ว
+
+สคริปต์จะลบ token ออกจาก remote URL ให้หลัง push เสมอ
